@@ -1,5 +1,6 @@
 import unittest
 import urllib
+import simplejson as json
 from trello import TrelloBroker
 
 token = "ea87582b8c52e85141722c08e1410eb6c40fb18d556058614065866f35c6af6b"
@@ -15,16 +16,20 @@ class TestCommentCard(unittest.TestCase):
 		self.payload = {'commits': []}
 
 	def test_commitMsgWithCardId(self):
-		commit = {'message': u'some message with card #1 in some board'}
-		self.broker.commentCard(1, commit)
+		message = 'some message with card #1 in some board'
+		commit = {'message': message}
+		boardId = self.publicBoard
+		self.broker.commentCard(1, boardId, commit)
 
 		opener = URLOpener()
-		url = 'https://api.trello.com/1/boards/' + self.publicBoard + '/cards/1?';
+		url = 'https://api.trello.com/1/boards/' + boardId + '/cards/1?';
 
 		query = urllib.urlencode({'actions': 'commentCard'})
-		card = opener.open(url+query).read()
-		print card
-		self.assertEqual(3, 3)
+		fd = opener.open(url+query)
+		card = json.load(fd)
+		last_comment = card["actions"][0]
+
+		self.assertEqual(last_comment["data"]["text"], message)
 
 
 if __name__ == '__main__':

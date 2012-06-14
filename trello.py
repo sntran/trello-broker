@@ -1,4 +1,5 @@
 import urllib
+import simplejson as json
 from brokers import BaseBroker
 
 class URLOpener(urllib.FancyURLopener):
@@ -37,8 +38,16 @@ class TrelloBroker(BaseBroker):
     def closeCard(self, cardId, commit):
       return
 
-    def commentCard(self, cardId, commit):
-      return
+    def commentCard(self, cardId, boardId, commit):
+      url = 'https://api.trello.com/1/'
+
+      opener = URLOpener()
+      token = "ea87582b8c52e85141722c08e1410eb6c40fb18d556058614065866f35c6af6b";
+      fd = opener.open(url + 'boards/' + boardId + '/cards/' + str(cardId) + '?token='+token);
+      card = json.load(fd)
+      fullId = card['id']
+      post_load = {'text': commit['message'], 'token': token, 'key': "d151447bdc437d1089c16011ff1933cf"}
+      opener.open(url+'cards/'+fullId+'/actions/comments?', urllib.urlencode(post_load))
 
     def subscribeCard(self, cardId):
       return
