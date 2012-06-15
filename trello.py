@@ -2,14 +2,17 @@ import urllib
 import simplejson as json
 from brokers import BaseBroker
 
+API_KEY = "d151447bdc437d1089c16011ff1933cf"
+API_SECRET = "8889354115ce172246e3c0335fb0e4527c1ecafb5ac1437a7656356f1eb3b191"
+BASE_URL = "https://api.trello.com/1/"
+CARD_URL = BASE_URL + "boards/%s/cards/%s?token=%s&key=" + API_KEY
+COMMENT_URL = BASE_URL + "cards/%s/actions/comments?"
+
 class URLOpener(urllib.FancyURLopener):
     version = 'bitbucket.org'
 
 class TrelloBroker(BaseBroker):
     def handle(self, payload):
-        apiKey = "d151447bdc437d1089c16011ff1933cf"
-        apiSecret = "8889354115ce172246e3c0335fb0e4527c1ecafb5ac1437a7656356f1eb3b191"
-
         board = payload['service']['board']
         token = payload['service']['token']
 
@@ -33,36 +36,19 @@ class TrelloBroker(BaseBroker):
     def parseCommit(self, commit):
         message = commit.message
 
-
-
     def closeCard(self, cardId, commit):
       return
 
-    def commentCard(self, cardId, boardId, commit):
-      url = 'https://api.trello.com/1/'
-
+    def commentCard(self, cardId, commit):
       opener = URLOpener()
-      token = "ea87582b8c52e85141722c08e1410eb6c40fb18d556058614065866f35c6af6b";
-      fd = opener.open(url + 'boards/' + boardId + '/cards/' + str(cardId) + '?token='+token);
-      card = json.load(fd)
+      res = opener.open(CARD_URL % (self.board, cardId, self.token));
+      card = json.load(res)
       fullId = card['id']
-      post_load = {'text': commit['message'], 'token': token, 'key': "d151447bdc437d1089c16011ff1933cf"}
-      opener.open(url+'cards/'+fullId+'/actions/comments?', urllib.urlencode(post_load))
+      post_load = {'text': commit['message'], 'token': self.token, 'key': API_KEY}
+      opener.open(COMMENT_URL % (fullId), urllib.urlencode(post_load))
 
     def subscribeCard(self, cardId):
       return
-        
-class TrelloData():
-    def __init__(self, payload):
-        self.full_url = payload['repository']['website']
-
-        # Strip trailing slashes
-        if self.full_url[-1:] == "/":
-            self.full_url = self.full_url[0:-1]
-
-        self.full_url = self.full_url + payload['repository']['absolute_url']
-        self.commits = payload['commits']
-        self.commits.reverse()
 
 if (__name__ == '__main__'):
     broker = TrelloBroker()
