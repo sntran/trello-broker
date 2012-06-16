@@ -1,12 +1,14 @@
 import urllib
-import simplejson as json
+import json
 from brokers import BaseBroker
 
 API_KEY = "d151447bdc437d1089c16011ff1933cf"
 API_SECRET = "8889354115ce172246e3c0335fb0e4527c1ecafb5ac1437a7656356f1eb3b191"
 BASE_URL = "https://api.trello.com/1/"
+MEMBER_URL = BASE_URL + "tokens/%s/member"
 CARD_URL = BASE_URL + "boards/%s/cards/%s?token=%s&key=" + API_KEY
 COMMENT_URL = BASE_URL + "cards/%s/actions/comments?"
+ASSIGN_MEMBER_URL = BASE_URL + "cards/%s/members"
 
 class URLOpener(urllib.FancyURLopener):
     version = 'bitbucket.org'
@@ -37,18 +39,23 @@ class TrelloBroker(BaseBroker):
         message = commit.message
 
     def closeCard(self, cardId, commit):
-      return
+        return
 
     def commentCard(self, cardId, commit):
-      opener = URLOpener()
-      res = opener.open(CARD_URL % (self.board, cardId, self.token));
-      card = json.load(res)
-      fullId = card['id']
-      post_load = {'text': commit['message'], 'token': self.token, 'key': API_KEY}
-      opener.open(COMMENT_URL % (fullId), urllib.urlencode(post_load))
+        opener = URLOpener()
+        res = opener.open(CARD_URL % (self.board, cardId, self.token));
+        card = json.load(res)
+        fullId = card['id']
+        post_load = {'text': commit['message'], 'token': self.token, 'key': API_KEY}
+        res = opener.open(COMMENT_URL % (fullId), urllib.urlencode(post_load))
+        authorId = json.load(res)['idMemberCreator']
+
+        post_load = {'value': authorId, 'token': self.token, 'key': API_KEY}
+        opener.open(ASSIGN_MEMBER_URL % fullId, urllib.urlencode(post_load))
+
 
     def subscribeCard(self, cardId):
-      return
+        return
 
 if (__name__ == '__main__'):
     broker = TrelloBroker()
