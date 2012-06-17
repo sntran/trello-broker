@@ -11,14 +11,24 @@ CARD_URL = BASE_URL + "/cards/%s"
 COMMENT_URL = CARD_URL + "/actions/comments"
 ASSIGN_MEMBER_URL = CARD_URL + "/members"
 
-def getCard(self, cardId):
-    params = {'token': self.token, 'key': API_KEY}
-    return requests.get(BOARD_CARD_URL % (self.board, cardId), params=params).json
+def getCard(self, cardId, fields = ''):
+    """Get the card data based on its short ID.
+
+    Keyword arguments:
+    cardId -- the short id of the card to query.
+    commit -- a list of fields to return, default to none.
+
+    """
+    params = {'token': self.token, 'key': API_KEY, 'fields': fields}
+    return requests.get(BOARD_CARD_URL % (self.board, cardId), 
+                        params=params).json
 
 class URLOpener(urllib.FancyURLopener):
     version = 'bitbucket.org'
 
 class TrelloBroker(BaseBroker):
+    __cardMap = dict()
+
     def handle(self, payload):
         board = payload['service']['board']
         token = payload['service']['token']
@@ -44,16 +54,25 @@ class TrelloBroker(BaseBroker):
         message = commit.message
 
     def closeCard(self, cardId, commit):
+        """Post the commit message as a comment and close the card.
+
+        Keyword arguments:
+        cardId -- the id of the card to perform actions to.
+        commit -- the commit dict with message to comment.
+
+        """
         # Comment the commit to the card
         self.commentCard(cardId, commit)
-        card = getCard(self, cardId)
-        fullId = card['id']
         # Close / Archive the card
         put_load = {'closed': 'true', 'token': self.token, 'key': API_KEY}
-        requests.put(CARD_URL % fullId, data=put_load)
+        requests.put(CARD_URL % self.__cardMap[cardId], data=put_load)
 
     def commentCard(self, cardId, commit):
         """Post the commit message as a comment and assign the author.
+        To perform any update to the card, card's fullID is required
+        instead of shortID. Therefore, need to query the fullID.
+        However, to avoid performing too many requests, a hash map
+        is used to lazy load the full ID.
 
         Keyword arguments:
         cardId -- the id of the card to perform actions to.
@@ -61,15 +80,17 @@ class TrelloBroker(BaseBroker):
 
         """
         
-        card = getCard(self, cardId)
-        fullId = card['id']
+        if cardId not in self.__cardMap:
+            """Lazy loading of card's full ID"""
+            card = getCard(self, cardId)
+            self.__cardMap[cardId] = card['id']
         
         post_load = {'text': commit['message'], 'token': self.token, 'key': API_KEY}
-        res = requests.post(COMMENT_URL % (fullId), data=post_load).json
+        res = requests.post(COMMENT_URL % (self.__cardMap[cardId]), data=post_load).json
         authorId = res['idMemberCreator']
 
         post_load = {'value': authorId, 'token': self.token, 'key': API_KEY}
-        requests.post(ASSIGN_MEMBER_URL % fullId, data=post_load)
+        requests.post(ASSIGN_MEMBER_URL % self.__cardMap[cardId], data=post_load)
 
 
     def subscribeCard(self, cardId):
