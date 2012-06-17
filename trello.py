@@ -4,15 +4,16 @@ from brokers import BaseBroker
 
 API_KEY = "d151447bdc437d1089c16011ff1933cf"
 API_SECRET = "8889354115ce172246e3c0335fb0e4527c1ecafb5ac1437a7656356f1eb3b191"
-BASE_URL = "https://api.trello.com/1/"
-MEMBER_URL = BASE_URL + "tokens/%s/member"
-CARD_URL = BASE_URL + "boards/%s/cards/%s"
-COMMENT_URL = BASE_URL + "cards/%s/actions/comments"
-ASSIGN_MEMBER_URL = BASE_URL + "cards/%s/members"
+BASE_URL = "https://api.trello.com/1"
+MEMBER_URL = BASE_URL + "/tokens/%s/member"
+BOARD_CARD_URL = BASE_URL + "/boards/%s/cards/%s"
+CARD_URL = BASE_URL + "/cards/%s"
+COMMENT_URL = CARD_URL + "/actions/comments"
+ASSIGN_MEMBER_URL = CARD_URL + "/members"
 
 def getCard(self, cardId):
     params = {'token': self.token, 'key': API_KEY}
-    return requests.get(CARD_URL % (self.board, cardId), params=params).json
+    return requests.get(BOARD_CARD_URL % (self.board, cardId), params=params).json
 
 class URLOpener(urllib.FancyURLopener):
     version = 'bitbucket.org'
@@ -43,7 +44,13 @@ class TrelloBroker(BaseBroker):
         message = commit.message
 
     def closeCard(self, cardId, commit):
+        # Comment the commit to the card
         self.commentCard(cardId, commit)
+        card = getCard(self, cardId)
+        fullId = card['id']
+        # Close / Archive the card
+        put_load = {'closed': 'true', 'token': self.token, 'key': API_KEY}
+        requests.put(CARD_URL % fullId, data=put_load)
 
     def commentCard(self, cardId, commit):
         """Post the commit message as a comment and assign the author.

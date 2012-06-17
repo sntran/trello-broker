@@ -115,5 +115,15 @@ class TestCloseCardPublicBoard(BaseTestCaseWithTokenAndPublicBoard):
         members = card['members']
         self.assertTrue(self.author in members)
 
+    def test_archiveMentionedCard(self):
+        message = "Fixed card #%s in with these changes." % self.cardIdShort
+        commit = {'message': message}
+        self.broker.closeCard(self.cardIdShort, commit)
+
+        # Card now should have been closed
+        card = getCard(self, {'fields': 'closed'})
+        self.assertTrue(card['closed'])
+
+
 if __name__ == '__main__':
     unittest.main()
