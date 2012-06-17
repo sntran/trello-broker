@@ -1,14 +1,18 @@
+from packages import requests
 import urllib
-import json
 from brokers import BaseBroker
 
 API_KEY = "d151447bdc437d1089c16011ff1933cf"
 API_SECRET = "8889354115ce172246e3c0335fb0e4527c1ecafb5ac1437a7656356f1eb3b191"
 BASE_URL = "https://api.trello.com/1/"
 MEMBER_URL = BASE_URL + "tokens/%s/member"
-CARD_URL = BASE_URL + "boards/%s/cards/%s?token=%s&key=" + API_KEY
-COMMENT_URL = BASE_URL + "cards/%s/actions/comments?"
+CARD_URL = BASE_URL + "boards/%s/cards/%s"
+COMMENT_URL = BASE_URL + "cards/%s/actions/comments"
 ASSIGN_MEMBER_URL = BASE_URL + "cards/%s/members"
+
+def getCard(self, cardId):
+    params = {'token': self.token, 'key': API_KEY}
+    return requests.get(CARD_URL % (self.board, cardId), params=params).json
 
 class URLOpener(urllib.FancyURLopener):
     version = 'bitbucket.org'
@@ -39,19 +43,26 @@ class TrelloBroker(BaseBroker):
         message = commit.message
 
     def closeCard(self, cardId, commit):
-        return
+        self.commentCard(cardId, commit)
 
     def commentCard(self, cardId, commit):
-        opener = URLOpener()
-        res = opener.open(CARD_URL % (self.board, cardId, self.token));
-        card = json.load(res)
+        """Post the commit message as a comment and assign the author.
+
+        Keyword arguments:
+        cardId -- the id of the card to perform actions to.
+        commit -- the commit dict with message to comment.
+
+        """
+        
+        card = getCard(self, cardId)
         fullId = card['id']
+        
         post_load = {'text': commit['message'], 'token': self.token, 'key': API_KEY}
-        res = opener.open(COMMENT_URL % (fullId), urllib.urlencode(post_load))
-        authorId = json.load(res)['idMemberCreator']
+        res = requests.post(COMMENT_URL % (fullId), data=post_load).json
+        authorId = res['idMemberCreator']
 
         post_load = {'value': authorId, 'token': self.token, 'key': API_KEY}
-        opener.open(ASSIGN_MEMBER_URL % fullId, urllib.urlencode(post_load))
+        requests.post(ASSIGN_MEMBER_URL % fullId, data=post_load)
 
 
     def subscribeCard(self, cardId):
