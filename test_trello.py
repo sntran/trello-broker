@@ -191,5 +191,77 @@ class TestHandleEachCommitBasedOnMessage(BaseTestCaseWithTokenAndPublicBoard):
         self.assertTrue(self.author in card['members'])
         self.assertFalse(card['closed'])
 
+    def test_commitMixOfCloseAndReference(self):
+        cards = []
+        names = ["To Be Closed", "To Be Referenced", "Another To Be Closed"]
+        for name in names:
+            cardInfo = {'name': name, 'idList': PUBLIC_LIST, 'token': TOKEN, 'key': API_KEY}
+            cards.append(requests.post(BASE_URL+"/cards", data=cardInfo).json)
+
+        cardIds = (cards[0]['idShort'], cards[1]['idShort'], cards[2]['idShort'])
+        message = "While having fixed tr#%s, check tr#%s and close tr#%s too" % cardIds
+                    
+        commit = {'message': message}
+        self.broker.handleCommit(commit)
+
+        params = {'actions': 'commentCard', 'members': 'true', 'fields': 'closed'}
+
+        # First card should be closed
+        idShort = cards[0]['idShort']
+        card = requests.get(CARD_URL % (self.broker.board, idShort), params=params).json
+        self.assertEqual(card['actions'][0]["data"]["text"], message)
+        self.assertTrue(self.author in card['members'])
+        self.assertTrue(card['closed'])
+
+        # Second card should not be closed
+        idShort = cards[1]['idShort']
+        card = requests.get(CARD_URL % (self.broker.board, idShort), params=params).json
+        self.assertEqual(card['actions'][0]["data"]["text"], message)
+        self.assertTrue(self.author in card['members'])
+        self.assertFalse(card['closed'])
+
+        # Third card should be closed also
+        idShort = cards[2]['idShort']
+        card = requests.get(CARD_URL % (self.broker.board, idShort), params=params).json
+        self.assertEqual(card['actions'][0]["data"]["text"], message)
+        self.assertTrue(self.author in card['members'])
+        self.assertTrue(card['closed'])
+
+    def test_commitWithMultipleReferencesButOnlyOneVerb(self):
+        cards = []
+        names = ["To Be Closed", "To Be Referenced", "Another To Be Referenced"]
+        for name in names:
+            cardInfo = {'name': name, 'idList': PUBLIC_LIST, 'token': TOKEN, 'key': API_KEY}
+            cards.append(requests.post(BASE_URL+"/cards", data=cardInfo).json)
+
+        cardIds = (cards[0]['idShort'], cards[1]['idShort'], cards[2]['idShort'])
+        message = "Fixed tr#%s, tr#%s, tr#%s " % cardIds
+                    
+        commit = {'message': message}
+        self.broker.handleCommit(commit)
+
+        params = {'actions': 'commentCard', 'members': 'true', 'fields': 'closed'}
+
+        # First card should be closed
+        idShort = cards[0]['idShort']
+        card = requests.get(CARD_URL % (self.broker.board, idShort), params=params).json
+        self.assertEqual(card['actions'][0]["data"]["text"], message)
+        self.assertTrue(self.author in card['members'])
+        self.assertTrue(card['closed'])
+
+        # Second card should not be closed
+        idShort = cards[1]['idShort']
+        card = requests.get(CARD_URL % (self.broker.board, idShort), params=params).json
+        self.assertEqual(card['actions'][0]["data"]["text"], message)
+        self.assertTrue(self.author in card['members'])
+        self.assertFalse(card['closed'])
+
+        # Third card should be closed also
+        idShort = cards[2]['idShort']
+        card = requests.get(CARD_URL % (self.broker.board, idShort), params=params).json
+        self.assertEqual(card['actions'][0]["data"]["text"], message)
+        self.assertTrue(self.author in card['members'])
+        self.assertFalse(card['closed'])
+
 if __name__ == '__main__':
     unittest.main()
