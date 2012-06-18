@@ -1,5 +1,5 @@
 from packages import requests
-import urllib
+import re
 from brokers import BaseBroker
 
 API_KEY = "d151447bdc437d1089c16011ff1933cf"
@@ -16,58 +16,48 @@ def getCard(self, cardId, fields = ''):
 
     Keyword arguments:
     cardId -- the short id of the card to query.
-    commit -- a list of fields to return, default to none.
+    fields -- a list of fields to return, default to none.
 
     """
     params = {'token': self.token, 'key': API_KEY, 'fields': fields}
     return requests.get(BOARD_CARD_URL % (self.board, cardId), 
                         params=params).json
 
-class URLOpener(urllib.FancyURLopener):
-    version = 'bitbucket.org'
-
 class TrelloBroker(BaseBroker):
     __cardMap = dict()
 
     def handle(self, payload):
-        board = payload['service']['board']
-        token = payload['service']['token']
-
-        # This code could very easily be used for a slightly different purpose.
-        # For example, if you need users to provide a username and API key in
-        # order to connect to your app, you could replace the line above with:
-        # username = payload['service']['username']
-        # api_key = payload['service']['api_key']
+        self.board = payload['service']['board']
+        self.token = payload['service']['token']
 
         del payload['service']
         del payload['broker']
 
-        post_load = { 'payload': sj.dumps(payload) }
-
-        opener = self.get_local('opener', URLOpener)
-        opener.open(url, urllib.urlencode(post_load))
-
         for commit in payload['commits']:
-            self.parseCommit(commit)
+            self.handleCommit(commit)
 
-    def parseCommit(self, commit):
-        message = commit.message
+    def handleCommit(self, commit):
+        pattern = re.compile(r"""
+            (               # start capturing the verb
+            fix             # contains 'fix'
+            | close         # or 'close'
+            |               # or just to reference
+            )               # end capturing the verb
+            e?              # maybe followed by 'e'
+            (?:s|d)?        # or 's' or 'd', not capturing
+            \s              # then a white space
+            tr[#]           # and 'tr#' to indicate the card
+            ([0-9]+)        # with the card's short id.
+            """, re.VERBOSE | re.IGNORECASE)
+        actions = pattern.findall(commit['message'])
+        for (action, cardId) in actions:
+            if action.lower() == 'fix' or action.lower() == 'close':
+                self.closeCard(cardId, commit)
+            else:
+                self.referenceCard(cardId, commit)
 
-    def closeCard(self, cardId, commit):
-        """Post the commit message as a comment and close the card.
 
-        Keyword arguments:
-        cardId -- the id of the card to perform actions to.
-        commit -- the commit dict with message to comment.
-
-        """
-        # Comment the commit to the card
-        self.commentCard(cardId, commit)
-        # Close / Archive the card
-        put_load = {'closed': 'true', 'token': self.token, 'key': API_KEY}
-        requests.put(CARD_URL % self.__cardMap[cardId], data=put_load)
-
-    def commentCard(self, cardId, commit):
+    def referenceCard(self, cardId, commit):
         """Post the commit message as a comment and assign the author.
         To perform any update to the card, card's fullID is required
         instead of shortID. Therefore, need to query the fullID.
@@ -92,9 +82,19 @@ class TrelloBroker(BaseBroker):
         post_load = {'value': authorId, 'token': self.token, 'key': API_KEY}
         requests.post(ASSIGN_MEMBER_URL % self.__cardMap[cardId], data=post_load)
 
+    def closeCard(self, cardId, commit):
+        """Post the commit message as a comment and close the card.
 
-    def subscribeCard(self, cardId):
-        return
+        Keyword arguments:
+        cardId -- the id of the card to perform actions to.
+        commit -- the commit dict with message to comment.
+
+        """
+        # Comment the commit to the card
+        self.referenceCard(cardId, commit)
+        # Close / Archive the card
+        put_load = {'closed': 'true', 'token': self.token, 'key': API_KEY}
+        requests.put(CARD_URL % self.__cardMap[cardId], data=put_load)
 
 if (__name__ == '__main__'):
     broker = TrelloBroker()
