@@ -24,7 +24,7 @@ A BitBucket Broker for interacting with Trello cards based on commit.
 
 I'm a firm believer in self-documented code instead of long documentation. But in case you wonder how everything works,
 
-See the [test cases](/test_trello.py)
+See the [test cases](./trello-broker/blob/master/test_trello.py)
 
 ## LICENSES
 
