@@ -13,7 +13,7 @@ A BitBucket Broker for interacting with Trello cards based on commit.
 * Board ID
 * User token with read-write access to public and private boards.
 
-## Usuages
+## Usages
 
 * Reference `tr#{cardShortId}` in commit message to add commit as a comment to the card.
 * Use `Fix/fixes/fixed/close/closes/closed tr#{shortId}` in commit message to archive the card (with commit as comment).
